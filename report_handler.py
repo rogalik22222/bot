@@ -102,8 +102,10 @@ def generate_report(nick: str, min_date: str, max_date: str) -> str:
     # Настройка Selenium
     service = Service(ChromeDriverManager().install())
     options = webdriver.ChromeOptions()
-    options.add_argument('--headless')  # Запуск в фоновом режиме
-
+    options.add_argument('--headless')  # только если необходимо
+    options.add_argument('--no-sandbox')
+    options.add_argument('--disable-dev-shm-usage')
+    options.add_argument('--disable-gpu')
     driver = webdriver.Chrome(service=service, options=options)
 
     print(f"Начинаю выгружать репорт игрока {nick} с {min_date} до {max_date}")

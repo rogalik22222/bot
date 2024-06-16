@@ -33,7 +33,10 @@ async def check_start(update: Update, context: CallbackContext) -> int:
 def get_player_id(nick):
     service = Service(ChromeDriverManager().install())
     options = webdriver.ChromeOptions()
-    options.add_argument('--headless')
+    options.add_argument('--headless')  # только если необходимо
+    options.add_argument('--no-sandbox')
+    options.add_argument('--disable-dev-shm-usage')
+    options.add_argument('--disable-gpu')
 
     driver = webdriver.Chrome(service=service, options=options)
     url = f"https://rodina.logsparser.info/accounts?server_number=5&name={nick}+"
@@ -78,7 +81,10 @@ async def check_nicknames(update: Update, context: CallbackContext) -> int:
 
             service = Service(ChromeDriverManager().install())
             options = webdriver.ChromeOptions()
-            options.add_argument('--headless')
+            options.add_argument('--headless')  # только если необходимо
+            options.add_argument('--no-sandbox')
+            options.add_argument('--disable-dev-shm-usage')
+            options.add_argument('--disable-gpu')
 
             driver = webdriver.Chrome(service=service, options=options)
             url = f"https://rodina.logsparser.info/?server_number=5&type%5B%5D=mail&type%5B%5D=password&type%5B%5D=vk_attach&type%5B%5D=vk_detach&type%5B%5D=googleauth_attach&type%5B%5D=googleauth_detach&sort=desc&player={player_id}&limit=1000"

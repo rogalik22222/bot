@@ -79,7 +79,10 @@ async def get_player_info(query, context: CallbackContext, nick, server):
 
     service = Service(ChromeDriverManager().install())
     options = webdriver.ChromeOptions()
-    options.add_argument('--headless')
+    options.add_argument('--headless')  # только если необходимо
+    options.add_argument('--no-sandbox')
+    options.add_argument('--disable-dev-shm-usage')
+    options.add_argument('--disable-gpu')
 
     driver = webdriver.Chrome(service=service, options=options)
     url = f"https://rodina.logsparser.info/accounts?server_number={server}&name={nick}+"
@@ -118,7 +121,10 @@ async def find_related_accounts(query, context: CallbackContext, server, reg_ip,
 
         service = Service(ChromeDriverManager().install())
         options = webdriver.ChromeOptions()
-        options.add_argument('--headless')
+        options.add_argument('--headless')  # только если необходимо
+        options.add_argument('--no-sandbox')
+        options.add_argument('--disable-dev-shm-usage')
+        options.add_argument('--disable-gpu')
 
         driver = webdriver.Chrome(service=service, options=options)
         url = f"https://rodina.logsparser.info/accounts?server_number=5&ip={ip}"
@@ -149,7 +155,10 @@ async def get_account_logs(query, context: CallbackContext, server, player_id):
 
     service = Service(ChromeDriverManager().install())
     options = webdriver.ChromeOptions()
-    options.add_argument('--headless')
+    options.add_argument('--headless')  # только если необходимо
+    options.add_argument('--no-sandbox')
+    options.add_argument('--disable-dev-shm-usage')
+    options.add_argument('--disable-gpu')
 
     driver = webdriver.Chrome(service=service, options=options)
     url = f"https://rodina.logsparser.info/?server_number=5&type%5B%5D=ban&type%5B%5D=jail&type%5B%5D=mute&type%5B%5D=banip&type%5B%5D=unban&type%5B%5D=unjail&type%5B%5D=unmute&type%5B%5D=unbanip&sort=desc&limit=1000&player={player_id}"
