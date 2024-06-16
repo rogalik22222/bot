@@ -37,7 +37,7 @@ async def date_from_uval(update: Update, context: CallbackContext) -> int:
     if roles in ['sled', 'tech', 'admin', 'developer']:
         min_date = update.message.text.strip()
         if not validate_date(min_date):
-            await update.message.reply_text("Пожалуйста, введите дату в правильном формате ДД.ММ.ГГГГ:")
+            await update.message.reply_text("Пожалуйста,начальную дату в формате ДД.ММ.ГГГГ:")
             return DATE_FROM
 
         context.user_data['min_date'] = min_date
