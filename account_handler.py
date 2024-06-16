@@ -9,7 +9,7 @@ from telegram.ext import CommandHandler, MessageHandler, filters, ConversationHa
 from config import COOKIES
 from database import *
 logging.basicConfig(level=logging.INFO)
-
+from webdriver_manager.chrome import ChromeDriverManager
 NICKNAMES = range(1)
 
 
@@ -31,7 +31,11 @@ async def get_player_id(update: Update, context: CallbackContext, nick: str):
 
     service = Service(ChromeDriverManager().install())
     options = webdriver.ChromeOptions()
-    options.add_argument('--headless')
+    options.add_argument('--headless')  # только если необходимо
+    options.add_argument('--no-sandbox')
+    options.add_argument('--disable-dev-shm-usage')
+    options.add_argument('--disable-gpu')
+
 
     driver = webdriver.Chrome(service=service, options=options)
     url = f"https://rodina.logsparser.info/accounts?server_number=5&name={nick}+"
