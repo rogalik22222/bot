@@ -84,7 +84,10 @@ async def find_ip(update: Update, context: CallbackContext) -> int:
         url1 = f"https://rodina.logsparser.info/?server_number=5&type%5B%5D=disconnect&sort=desc&player={player_id}&limit=1000"
         service = Service(ChromeDriverManager().install())
         options = webdriver.ChromeOptions()
-        options.add_argument('--headless')
+        options.add_argument('--headless')  # только если необходимо
+        options.add_argument('--no-sandbox')
+        options.add_argument('--disable-dev-shm-usage')
+        options.add_argument('--disable-gpu')
 
         driver = webdriver.Chrome(service=service, options=options)
         try:
@@ -141,11 +144,13 @@ async def find_accounts_by_ips(update: Update, context: CallbackContext, driver,
         for cookie in COOKIES:
             driver.add_cookie(cookie)
         driver.get(url)
+
         time.sleep(15)
 
         html = driver.page_source
         soup = BeautifulSoup(html, 'html.parser')
         rows = soup.find_all('tr')
+
 
         if rows:
             message_lines = [f'Найдено входы по IP: {ip}']
