@@ -49,3 +49,13 @@ def delete_user(user_id):
         cursor = conn.cursor()
         cursor.execute("DELETE FROM users WHERE user_id = ?", (user_id,))
         conn.commit()
+
+def get_server(user_id):
+    with sqlite3.connect("database.db") as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT server FROM users WHERE user_id = ?", (user_id,))
+        result = cursor.fetchone()
+        return result[0] if result else None
+
+
+
