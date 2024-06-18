@@ -20,33 +20,41 @@ from trade_handler import (
 from check_handler import get_conversation_handler, check_start as c_start
 from account_handler import accountc_handler, account_start, NICKNAMES
 from accountban_handler import accountcc_handler, account_start as a_start
-from database import init_db, add_user, get_user_role, update_user_role, get_all_users, delete_user
+from database import init_db, add_user, get_user_role, update_user_role, get_all_users, delete_user, get_server
 from dostups import *
 import sqlite3
 from config import *
 from accountban_handler import accountcc_handler, account_start as acc_start
 from uval_handler import *
 from gospay_handler import check_start as gos_start, date_from_gos,  date_to_gos, get_fraction, FRACTION
-
+import logging
+import sys
+from get_log import send_file
+# Initialize logging configuration
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     level=logging.INFO,
+    handlers=[
+        logging.FileHandler('bot.log', encoding='utf-8'),  # File handler with UTF-8 encoding
+        logging.StreamHandler(sys.stdout)  # Stream handler using default (UTF-8)
+    ]
 )
 
 logger = logging.getLogger(__name__)
 
 DATE_FROM, DATE_TO, NICKNAMES, SERVER, NICKNAME, DELETE_USER , ROLE_USER_ID, ROLE_NEW_ROLE, TELEGRAM_USER  = range(9)
 
+async def log_button_press(update: Update, context: CallbackContext) -> None:
+    user = update.message.from_user
+    logger.info(f"User {user.username} ({user.id}) pressed button: {update.message.text}")
 
 async def cancel(update: Update, context: CallbackContext) -> int:
     await update.message.reply_text("Операция отменена.")
     return ConversationHandler.END
 
-
 async def start(update: Update, context: CallbackContext) -> None:
     user_id = update.message.from_user.id
     role = get_user_role(user_id)
-
     if not role:
         await update.message.reply_text(
             "Вы не зарегистрированы. Используйте /register для регистрации."
@@ -64,7 +72,6 @@ async def start(update: Update, context: CallbackContext) -> None:
         ["Проверка кандидатов1️⃣3️⃣$"],
     ]
 
-    # Настройка кнопок на основе роли
     if role == "sled":
         reply_keyboard = [
             ["Проверить онлайн⏰", "Проверить привязки🔗", "Для следящих☠️"],
@@ -84,7 +91,7 @@ async def start(update: Update, context: CallbackContext) -> None:
 
     elif role == "tech":
         reply_keyboard = [
-            ["Работа с аккаунтами🤖", "Для следящих☠️"  ],
+            ["Работа с аккаунтами🤖", "Для следящих☠️"],
         ]
         reply_markup = ReplyKeyboardMarkup(
             reply_keyboard, one_time_keyboard=False, resize_keyboard=True
@@ -94,6 +101,7 @@ async def start(update: Update, context: CallbackContext) -> None:
         reply_keyboard = [
             ["Работа с аккаунтами🤖", "Для следящих☠️"],
             ["Управление аккаунтами🔧", "Проверка кандидатов1️⃣3️⃣"],
+            ["Выгрузка логов📖"],
 
         ]
         reply_markup = ReplyKeyboardMarkup(
@@ -109,11 +117,10 @@ async def start(update: Update, context: CallbackContext) -> None:
         "Выберите действие:", reply_markup=reply_markup
     )
 
-
 async def register_start(update: Update, context: CallbackContext) -> int:
+    await log_button_press(update, context)
     user_id = update.message.from_user.id
     role = get_user_role(user_id)
-
 
     if role == "registered":
         await update.message.reply_text(
@@ -122,7 +129,6 @@ async def register_start(update: Update, context: CallbackContext) -> int:
         await start(update, context)
         return ConversationHandler.END
 
-    # Проверяем, есть ли уже заявка
     if role is not None and role != 'removed':
         await update.message.reply_text(
             "Ваша заявка уже отправлена на регистрацию. Ожидайте подтверждения."
@@ -133,16 +139,13 @@ async def register_start(update: Update, context: CallbackContext) -> int:
         await start(update, context)
         return ConversationHandler.END
 
-
     await update.message.reply_text("Напишите ваш Nick_name:")
     return NICKNAME
 
-
 async def register_nickname(update: Update, context: CallbackContext) -> int:
+    await log_button_press(update, context)
     user_id = update.message.from_user.id
     role = get_user_role(user_id)
-
-    # Если уже есть заявка, использовать сохраненные данные
     if role == "registered":
         await update.message.reply_text(
             "Вы уже зарегистрированы и ожидаете подтверждения."
@@ -152,17 +155,14 @@ async def register_nickname(update: Update, context: CallbackContext) -> int:
 
     nickname = update.message.text
     context.user_data["nickname"] = nickname
-
-    # Сохраняем никнейм в базу данных для новой заявки
     await update.message.reply_text("Сервер от 1 до 7:")
     return SERVER
 
-
 async def register_server(update: Update, context: CallbackContext) -> int:
+    await log_button_press(update, context)
     user_id = update.message.from_user.id
     role = get_user_role(user_id)
     telegram_id = update.message.from_user.username
-    # Если уже есть заявка, использовать сохраненные данные
     if role == "registered":
         await update.message.reply_text(
             "Вы уже зарегистрированы и ожидаете подтверждения."
@@ -172,7 +172,6 @@ async def register_server(update: Update, context: CallbackContext) -> int:
 
     server = update.message.text
     nickname = context.user_data.get("nickname")
-
     try:
         add_user(user_id, telegram_id, nickname, "registered", int(server))
         logging.info(f"Пользователь {nickname} ожидает подстверждения")
@@ -185,37 +184,36 @@ async def register_server(update: Update, context: CallbackContext) -> int:
     return ConversationHandler.END
 
 async def sled_button(update: Update, context: CallbackContext) -> int:
+    await log_button_press(update, context)
     user_id = update.message.from_user.id
     role = get_user_role(user_id)
     if role in ['sled', 'tech', 'admin', 'developer']:
         reply_keyboard = [
             ["Увольнения с фракции✏️", "Принятие во фракцию🚪", "Снятие денег с фракции💶"],
-            ["/cancel","Назад"],
+            ["/cancel", "Назад"],
         ]
         reply_markup = ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=False, resize_keyboard=True)
-
         await update.message.reply_text(
             "Выберите действие:", reply_markup=reply_markup
         )
-
-
     else:
         await update.message.reply_text("Отказано в доступе")
         await start(update, context)
         return ConversationHandler.END
 
 async def for_adm_acc_button(update: Update, context: CallbackContext) -> int:
+    await log_button_press(update, context)
     user_id = update.message.from_user.id
     role = get_user_role(user_id)
     if role in ['admin', 'developer']:
         reply_keyboard = [
-            ["Список заявок🗒","Список пользователей👨‍👨‍👧‍👦","Изменить доступ🔐"],
+            ["Список заявок🗒", "Список пользователей👨‍👨‍👧‍👦", "Изменить доступ🔐"],
             ["Назад"],
         ]
         await update.message.reply_text(
             "Выберите действие:",
             reply_markup=ReplyKeyboardMarkup(
-                reply_keyboard, one_time_keyboard=False , resize_keyboard=True
+                reply_keyboard, one_time_keyboard=False, resize_keyboard=True
             )
         )
     else:
@@ -223,28 +221,27 @@ async def for_adm_acc_button(update: Update, context: CallbackContext) -> int:
         await start(update, context)
         return ConversationHandler.END
 
-
 async def for_account_button(update: Update, context: CallbackContext) -> int:
+    await log_button_press(update, context)
     user_id = update.message.from_user.id
     role = get_user_role(user_id)
     if role in ['tech', 'admin', 'developer']:
         reply_keyboard = [
             ["Выгрузка репорта📖", "Проверить онлайн⏰"],
             ["Проверить привязки🔗", "Проверить передачи🤑"],
-            ["Проверить твинки🤡", ],
+            ["Проверить твинки🤡"],
             ["/cancel", "Назад"],
         ]
         await update.message.reply_text(
             "Выберите действие:",
             reply_markup=ReplyKeyboardMarkup(
-                reply_keyboard, one_time_keyboard=False
+                reply_keyboard, one_time_keyboard=False, resize_keyboard=True
             )
         )
     else:
         await update.message.reply_text("Отказано в доступе")
         await start(update, context)
         return ConversationHandler.END
-
 async def manage_accounts(update: Update, context: CallbackContext) -> None:
     user_id = update.message.from_user.id
     role = get_user_role(user_id)
@@ -264,9 +261,6 @@ async def manage_accounts(update: Update, context: CallbackContext) -> None:
             reply_keyboard, one_time_keyboard=False, resize_keyboard=True
         ),
     )
-
-
-
 
 async def list_pending_users(update: Update, context: CallbackContext):
     pending_users = get_all_users()  # Fetch users with 'registered' status
@@ -592,7 +586,7 @@ def main() -> None:
     application.add_handler(MessageHandler(filters.Regex("^Для следящих☠️$"), sled_button))
     application.add_handler(MessageHandler(filters.Regex("^Работа с аккаунтами🤖$"), for_account_button))
     application.add_handler(MessageHandler(filters.Regex('^Проверка кандидатов1️⃣3️⃣$'), acc_start))
-
+    application.add_handler(MessageHandler(filters.Regex('^Выгрузка логов📖$'), send_file))
     application.add_handler(ConversationHandler(
         entry_points=[MessageHandler(filters.Regex("^Список заявок🗒$"), list_pending_users)],
         states={},
