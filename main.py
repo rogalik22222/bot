@@ -35,18 +35,20 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     level=logging.INFO,
     handlers=[
-        logging.FileHandler('bot.log', encoding='utf-8'),  # File handler with UTF-8 encoding
-        logging.StreamHandler(sys.stdout)  # Stream handler using default (UTF-8)
+        logging.FileHandler('C:/Users/Valerka/Desktop/bot-main/bot.log', encoding='utf-8', mode='a'),
+        logging.StreamHandler(sys.stdout)
     ]
 )
 
 logger = logging.getLogger(__name__)
 
+
+
 DATE_FROM, DATE_TO, NICKNAMES, SERVER, NICKNAME, DELETE_USER , ROLE_USER_ID, ROLE_NEW_ROLE, TELEGRAM_USER  = range(9)
 
 async def log_button_press(update: Update, context: CallbackContext) -> None:
     user = update.message.from_user
-    logger.info(f"User {user.username} ({user.id}) pressed button: {update.message.text}")
+    logging.info(f"User {user.username} ({user.id}) pressed button: {update.message.text}")
 
 async def cancel(update: Update, context: CallbackContext) -> int:
     await update.message.reply_text("Операция отменена.")
@@ -403,7 +405,7 @@ async def change_role_new_role(update: Update, context: CallbackContext) -> int:
     # Проверка роли администраторов перед обновлением роли пользователя
     admin_role = get_user_role(update.message.from_user.id)
 
-    if new_role == "developer":
+    if new_role == "developer" or new_role == "admin":
         # Если текущий пользователь админ и хочет выдать роль developer другому пользователю
         if admin_role == "admin":
             # Удаляем текущего админа
@@ -468,7 +470,7 @@ async def list_users(update: Update, context: CallbackContext) -> None:
         users = get_all_users()
         response = "Список пользователей:\n"
         for user in users:
-            response += f"ID: {user[0]}, Nickname: {user[1]}, Role: {user[2]}, Server: {user[3]}\n"
+            response += f"ID: {user[0]}, Telegram: {user[1]}, Nick_Name: {user[2]}, Dostup: {user[3]}, Server:{user[4]}\n"
         await update.message.reply_text(response)
     else:
         await update.message.reply_text("Отказано в доступе")
