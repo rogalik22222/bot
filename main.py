@@ -411,7 +411,7 @@ async def change_role_new_role(update: Update, context: CallbackContext) -> int:
             # Удаляем текущего админа
             update_user_role(update.message.from_user.id, "removed")
             await update.message.reply_text(
-                "Ваш статус был удалён за попытку дать роль developer другому пользователю.")
+                "Ваш статус был удалён за попытку дать роль высокого статуса другому пользователю.")
             return ConversationHandler.END
 
         # Если текущий пользователь админ и хочет выдать роль developer другому пользователю
