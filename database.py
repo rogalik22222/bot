@@ -41,7 +41,7 @@ def update_user_role(user_id, new_role):
 def get_all_users():
     with sqlite3.connect("database.db") as conn:
         cursor = conn.cursor()
-        cursor.execute("SELECT user_id, nickname, role, server FROM users")
+        cursor.execute("SELECT user_id, telegram_id, nickname, role, server FROM users")
         return cursor.fetchall()
 
 def delete_user(user_id):
