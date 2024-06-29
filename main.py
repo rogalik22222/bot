@@ -48,7 +48,7 @@ DATE_FROM, DATE_TO, NICKNAMES, SERVER, NICKNAME, DELETE_USER , ROLE_USER_ID, ROL
 
 async def log_button_press(update: Update, context: CallbackContext) -> None:
     user = update.message.from_user
-    logging.info(f"User {user.username} ({user.id}) pressed button: {update.message.text}")
+    logger.info(f"User {user.username} ({user.id}) pressed button: {update.message.text}")
 
 async def cancel(update: Update, context: CallbackContext) -> int:
     await update.message.reply_text("Операция отменена.")
