@@ -60,6 +60,9 @@ async def nicknames(update: Update, context: CallbackContext) -> int:
     return ConversationHandler.END
 
 async def check_online(update: Update, context: CallbackContext, nick: str, min_per: str, max_per: str) -> str:
+    from database import get_server
+    user_id = update.message.from_user.id
+    aserver = get_server(user_id)
     service = Service(ChromeDriverManager().install())
     options = webdriver.ChromeOptions()
     options.add_argument('--headless')  # только если необходимо
@@ -72,7 +75,7 @@ async def check_online(update: Update, context: CallbackContext, nick: str, min_
     min_per_formatted = datetime.strptime(min_per, '%d.%m.%Y').strftime('%Y-%m-%d')
     max_per_formatted = datetime.strptime(max_per, '%d.%m.%Y').strftime('%Y-%m-%d')
 
-    url = f"https://rodina.logsparser.info/?server_number=5&type%5B%5D=disconnect&sort=desc&player={nick}&min_period={min_per_formatted}+00%3A00%3A00&max_period={max_per_formatted}+23%3A58%3A58&limit=1000"
+    url = f"https://rodina.logsparser.info/?server_number={aserver}&type%5B%5D=disconnect&sort=desc&player={nick}&min_period={min_per_formatted}+00%3A00%3A00&max_period={max_per_formatted}+23%3A58%3A58&limit=1000"
 
     driver.get(url)
     for cookie in COOKIES:
