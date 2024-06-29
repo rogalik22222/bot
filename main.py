@@ -35,7 +35,7 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     level=logging.INFO,
     handlers=[
-        logging.FileHandler('bot.log', encoding='utf-8', mode='w'),
+        logging.FileHandler('bot.log', encoding='utf-8', mode='a'),
         logging.StreamHandler(sys.stdout)
     ]
 )
