@@ -120,10 +120,16 @@ async def start(update: Update, context: CallbackContext) -> None:
         reply_markup = ReplyKeyboardMarkup(
             reply_keyboard, one_time_keyboard=False, resize_keyboard=True
         )
+    if role != 'registered':
+        await update.message.reply_text(
+            "Выберите действие:", reply_markup=reply_markup
+        )
+    else:
+        await update.message.reply_text(
+            "Ждите одобрения", reply_markup=reply_markup
+        )
 
-    await update.message.reply_text(
-        "Ждите одобрения", reply_markup=reply_markup
-    )
+
 
 async def register_start(update: Update, context: CallbackContext) -> int:
     await log_button_press(update, context)
