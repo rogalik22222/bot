@@ -11,11 +11,12 @@ import time
 import os
 from config import COOKIES, API_KEY
 from database import get_user_role
-
+from database import *
 # Conversation states
+import logging
 DATE_FROM, DATE_TO, FRACTION = range(3)
 
-
+logger = logging.getLogger()
 
 # Function to start the conversation and ask for the start date
 async def check_start(update: Update, context: CallbackContext) -> int:
@@ -59,12 +60,15 @@ async def get_fraction(update: Update, context: CallbackContext) -> int:
 
 async def check_fraction(update: Update, context: CallbackContext):
     fraction, date_from, date_to = get_check_parameters(context)
+    user = update.message.from_user
     driver = setup_selenium_driver()
-    url = build_url(date_from, date_to, fraction)
+    url = build_url(date_from, date_to, fraction, update, context)
     html = fetch_page_source(driver, url)
     log_lines = extract_log_lines(html)
     inventory_data = parse_inventory(log_lines)
-    await send_inventory_report(update, fraction, inventory_data)
+    logger.info(f"Пользователь {user.username} ({user.id}) Начал проверку снятия денег с казны фракции игрока: {fraction} с {date_from} по {date_to}")
+    await send_otchet(update, fraction, inventory_data, context)
+
     driver.quit()
 
 def get_check_parameters(context: CallbackContext):
@@ -73,17 +77,19 @@ def get_check_parameters(context: CallbackContext):
 def setup_selenium_driver():
     service = Service(ChromeDriverManager().install())
     options = webdriver.ChromeOptions()
-    options.add_argument('--headless')  # только если необходимо
+    options.add_argument('--headless')  # only if necessary
     options.add_argument('--no-sandbox')
     options.add_argument('--disable-dev-shm-usage')
     options.add_argument('--disable-gpu')
     driver = webdriver.Chrome(service=service, options=options)
     return driver
 
-def build_url(date_from: str, date_to: str, fraction: str) -> str:
+def build_url(date_from: str, date_to: str, fraction: str, update: Update, context: CallbackContext) -> str:
+    user_id = update.message.from_user.id
+    aserver = get_server(user_id)
     date_from_formatted = datetime.strptime(date_from, '%d.%m.%Y').strftime('%Y-%m-%d')
     date_to_formatted = datetime.strptime(date_to, '%d.%m.%Y').strftime('%Y-%m-%d')
-    return (f"https://rodina.logsparser.info/?server_number=5&type%5B%5D=money_add&sort=desc"
+    return (f"https://rodina.logsparser.info/?server_number={aserver}&type%5B%5D=money_add&sort=desc"
             f"&min_period={date_from_formatted}+00%3A00%3A00&max_period={date_to_formatted}+23%3A59%3A59"
             f"&limit=1000&dynamic%5B61%5D=+снял+со+счета+организации+{fraction}")
 
@@ -110,7 +116,8 @@ def parse_inventory(log_lines):
     # Placeholder function to parse logs
     return log_lines
 
-async def send_inventory_report(update: Update, fraction: str, inventory_data , context=CallbackContext):
+async def send_otchet(update: Update, fraction: str, inventory_data, context: CallbackContext):
+    user = update.message.from_user
     from main import start
     file_path = f"{fraction}.txt"
     with open(file_path, 'w', encoding='utf8') as file:
@@ -119,6 +126,7 @@ async def send_inventory_report(update: Update, fraction: str, inventory_data , 
     if os.path.getsize(file_path) > 0:
         with open(file_path, 'rb') as file:
             await update.message.reply_document(document=file)
+        logger.info(f"Пользователь {user.username} ({user.id}) Получил файл с проверки снятия казны фракции")
     else:
         await update.message.reply_text(f"Нет данных для фракции {fraction} за указанный период.")
     await start(update, context)

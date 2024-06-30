@@ -9,7 +9,9 @@ from webdriver_manager.chrome import ChromeDriverManager
 from bs4 import BeautifulSoup
 from config import COOKIES
 from dostups import *
+import logging
 DATE_FROM, DATE_TO, NICKNAMES = range(3)
+logger = logging.getLogger()
 
 async def check_start(update: Update, context: CallbackContext) -> int:
     user_id = update.message.from_user.id
@@ -33,6 +35,8 @@ async def date_to(update: Update, context: CallbackContext) -> int:
 async def nicknames(update: Update, context: CallbackContext) -> int:
     nicknames_text = update.message.text
     await update.message.reply_text('Начал проверку онлайна в логах')
+    user = update.message.from_user
+
     if '\n' in nicknames_text:
         nicknames = [nick.strip() for nick in nicknames_text.split('\n')]
     else:
@@ -43,7 +47,8 @@ async def nicknames(update: Update, context: CallbackContext) -> int:
     date_to = context.user_data['date_to']
 
     combined_log = f"Онлайн с {date_from} до {date_to}\n"
-
+    logger.info(
+        f"Пользователь {user.username} ({user.id}) Начал проверку онлайна игрока(ов) {nicknames} c {date_from} по {date_to}")
     for nick in nicknames:
         log = await check_online(update, context, nick, date_from, date_to)
         if log:
@@ -55,6 +60,8 @@ async def nicknames(update: Update, context: CallbackContext) -> int:
 
     with open(file_path, 'rb') as file:
         await update.message.reply_document(document=file)
+        logger.info(
+            f"Пользователь {user.username} ({user.id}) Получил файл с онлайном ника(ов) {nicknames} c {date_from} по {date_to}")
 
     os.remove(file_path)
     return ConversationHandler.END

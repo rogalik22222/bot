@@ -17,9 +17,10 @@ from webdriver_manager.chrome import ChromeDriverManager
 from bs4 import BeautifulSoup
 from config import COOKIES, API_KEY
 # Состояния разговора
+import logging
 DATE_FROM, DATE_TO, NICKNAMES = range(3)
 from database import *
-
+logger = logging.getLogger()
 
 
 # Функция для начала разговора и запроса даты начала
@@ -39,7 +40,7 @@ async def date_from(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     await update.message.reply_text('Введите дату окончания (в формате ДД.ММ.ГГГГ):')
     return DATE_TO
 
-# Функция для запроса никнеймов
+# Функция для запроса никнеймов.
 async def date_to(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     context.user_data['date_to'] = update.message.text
     await update.message.reply_text('Введите никнеймы (можно в столбик несколько):')
@@ -48,6 +49,7 @@ async def date_to(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 # Функция для сбора никнеймов
 async def nicknames(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     nicknames_text = update.message.text
+    user = update.message.from_user
     await update.message.reply_text('Начинаю проверку передач')
     if '\n' in nicknames_text:
         nicknames = [nick.strip() for nick in nicknames_text.split('\n')]
@@ -57,7 +59,7 @@ async def nicknames(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
     date_from = context.user_data['date_from']
     date_to = context.user_data['date_to']
-
+    logger.info(f"Пользователь {user.username} ({user.id}) Начал проверку передач игрока(ов) {nicknames}  с {date_from} по {date_to}")
     # Проверка инвентаря для каждого никнейма
     for nick in nicknames:
         await check_inventory(update, context, nick, date_from, date_to)
@@ -66,6 +68,10 @@ async def nicknames(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 # Функция для проверки инвентаря
 async def check_inventory(update: Update, context: ContextTypes.DEFAULT_TYPE, nick: str, date_from: str, date_to: str) -> None:
     # Настройка Selenium
+    from database import get_server
+    user_id = update.message.from_user.id
+    aserver = get_server(user_id)
+    user = update.message.from_user
     service = Service(ChromeDriverManager().install())
     options = webdriver.ChromeOptions()
     options.add_argument('--headless')  # только если необходимо
@@ -79,7 +85,7 @@ async def check_inventory(update: Update, context: ContextTypes.DEFAULT_TYPE, ni
     date_from_formatted = datetime.strptime(date_from, '%d.%m.%Y').strftime('%Y-%m-%d')
     date_to_formatted = datetime.strptime(date_to, '%d.%m.%Y').strftime('%Y-%m-%d')
 
-    url = f"https://rodina.logsparser.info/?server_number=5&type%5B%5D=inventory_give&sort=desc&&type%5B%5D=money_remove&player={nick}&min_period={date_from_formatted}+00%3A00%3A00&max_period={date_to_formatted}+23%3A59%3A59&limit=1000"
+    url = f"https://rodina.logsparser.info/?server_number={aserver}&type%5B%5D=inventory_give&sort=desc&&type%5B%5D=money_remove&player={nick}&min_period={date_from_formatted}+00%3A00%3A00&max_period={date_to_formatted}+23%3A59%3A59&limit=1000"
     driver.get(url)
     for cookie in COOKIES:
         driver.add_cookie(cookie)
@@ -109,7 +115,11 @@ async def check_inventory(update: Update, context: ContextTypes.DEFAULT_TYPE, ni
     if os.path.getsize(file_path) > 0:
         with open(file_path, 'rb') as file:
             await update.message.reply_document(document=file)
+            logger.info(
+                f"Пользователь {user.username} ({user.id}) Получил файл с проверкой поредач ника(ов) {nick}  с {date_from} по {date_to}")
     else:
+        logger.info(
+            f"Пользователь {user.username} ({user.id}) Не файл с проверкой поредач ника(ов) {nick}  с {date_from} по {date_to} ")
         await update.message.reply_text(f"Нет данных для никнейма {nick} за указанный период.")
 
     os.remove(file_path)

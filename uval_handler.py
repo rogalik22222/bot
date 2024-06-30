@@ -13,15 +13,11 @@ from bs4 import BeautifulSoup
 import logging
 from dostups import *
 import time
-logging.basicConfig(
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=logging.INFO
-)
-logger = logging.getLogger(__name__)
-
+import logging
+from database import get_server
 # Определяем этапы разговора
 DATE_FROM, DATE_TO, NICKNAMES = range(3)
-
+logger = logging.getLogger()
 # Функция для проверки корректности формата даты
 def validate_date(date_str):
     try:
@@ -37,7 +33,7 @@ async def date_from_uval(update: Update, context: CallbackContext) -> int:
     if roles in ['sled', 'tech', 'admin', 'developer']:
         min_date = update.message.text.strip()
         if not validate_date(min_date):
-            await update.message.reply_text("Пожалуйста,начальную дату в формате ДД.ММ.ГГГГ:")
+            await update.message.reply_text("Пожалуйста, начальную дату в формате ДД.ММ.ГГГГ:")
             return DATE_FROM
 
         context.user_data['min_date'] = min_date
@@ -46,8 +42,6 @@ async def date_from_uval(update: Update, context: CallbackContext) -> int:
 
     await update.message.reply_text('Отказано в доступе')
     return ConversationHandler.END
-
-
 
 async def date_to_uval(update: Update, context: CallbackContext) -> int:
     max_date = update.message.text.strip()
@@ -60,6 +54,7 @@ async def date_to_uval(update: Update, context: CallbackContext) -> int:
     return NICKNAMES
 
 async def nicknames_uval(update: Update, context: CallbackContext) -> int:
+    user = update.message.from_user
     try:
         nicknames = update.message.text.split('\n')
         nicknames = [nick.strip() for nick in nicknames if nick.strip()]
@@ -72,27 +67,33 @@ async def nicknames_uval(update: Update, context: CallbackContext) -> int:
         max_date = context.user_data['max_date']
 
         await update.message.reply_text("Генерация отчета...")
+        logger.info(
+            f"Пользователь {user.username} ({user.id}) Начал проверку увольнений по нику(ам){nicknames} С {min_date} по {max_date}")
         for nick in nicknames:
-            file_path = generate_uval(nick, min_date, max_date)
+            file_path = generate_uval(update, context, nick, min_date, max_date)
             if os.path.getsize(file_path) > 0:  # Проверка на непустой файл
                 with open(file_path, 'rb') as report_file:
+                    logger.info(
+                        f"Пользователь {user.username} ({user.id}) получил файл с увольнениями  игрока {nicknames} С {min_date} по {max_date} ")
                     await context.bot.send_document(chat_id=update.message.chat.id, document=report_file)
             else:
                 await update.message.reply_text(f"Файл отчета для {nick} пуст.")
+                logger.info(
+                    f"Пользователь {user.username} ({user.id})  не получил файл с увольнениями  игрока {nicknames} С {min_date} по {max_date} Причина:он пустой ")
 
             os.remove(file_path)
     except Exception as e:
-        logger.error(f"Произошла ошибка: {e}")
+
         await update.message.reply_text(f"Произошла ошибка: {str(e)}")
 
     return ConversationHandler.END
 
-
-def generate_uval(nick: str, min_date: str, max_date: str) -> str:
+def generate_uval(update: Update, context: CallbackContext, nick: str, min_date: str, max_date: str) -> str:
     # Преобразование формата даты для URL
     min_date = datetime.strptime(min_date, '%d.%m.%Y').strftime('%Y-%m-%d')
     max_date = datetime.strptime(max_date, '%d.%m.%Y').strftime('%Y-%m-%d')
-
+    user_id = update.message.from_user.id
+    aserver = get_server(user_id)
     # Настройка Selenium
     service = Service(ChromeDriverManager().install())
     options = webdriver.ChromeOptions()
@@ -103,8 +104,8 @@ def generate_uval(nick: str, min_date: str, max_date: str) -> str:
 
     driver = webdriver.Chrome(service=service, options=options)
 
-    print(f"Начинаю поиск увольнений  от лидера {nick} с {min_date} до {max_date}")
-    url = f"https://rodina.logsparser.info/?server_number=5&type%5B%5D=uninvite&sort=desc&player={nick}&min_period={min_date}+00%3A00%3A00&max_period={max_date}+23%3A58%3A58&limit=1000"
+    print(f"Начинаю поиск увольнений от лидера {nick} с {min_date} до {max_date}")
+    url = f"https://rodina.logsparser.info/?server_number={aserver}&type%5B%5D=uninvite&sort=desc&player={nick}&min_period={min_date}+00%3A00%3A00&max_period={max_date}+23%3A58%3A58&limit=1000"
 
     try:
         driver.get(url)
@@ -128,9 +129,7 @@ def generate_uval(nick: str, min_date: str, max_date: str) -> str:
 
                 if not rows:
                     print(f"Нет данных на странице {page_num} для {nick}")
-
                     break
-
 
                 has_data = False
                 for row in rows:
@@ -141,7 +140,6 @@ def generate_uval(nick: str, min_date: str, max_date: str) -> str:
 
                 if not has_data:
                     print(f"Нет данных на странице {page_num} для {nick}")
-
                     break
 
                 page_num += 1

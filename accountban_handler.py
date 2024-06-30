@@ -14,14 +14,11 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.by import By
 import asyncio
-
-# Настройка логирования
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-                    datefmt='%d.%m.%Y %H:%M:%S')
-logger = logging.getLogger(__name__)
+import sys
 
 NICKNAMES, SERVER = range(2)
 
+logger = logging.getLogger()
 
 async def account_start(update: Update, context: CallbackContext) -> int:
     user_id = update.message.from_user.id
@@ -41,8 +38,8 @@ async def get_server_choice(update: Update, context: CallbackContext) -> int:
     user_id = update.message.from_user.id
     nicknames = update.message.text.strip().split('\n')
     context.user_data['nicknames'] = [nick.strip() for nick in nicknames if nick.strip()]
-
-    logger.info(f"Пользователь {user_id} ввел ники: {context.user_data['nicknames']}")
+    user = update.message.from_user
+    logger.info(f"Пользователь {user.username} ({user.id}) ввел ники: {context.user_data['nicknames']}")
 
     keyboard = [
         [InlineKeyboardButton(f"{i}", callback_data=str(i)) for i in range(1, 8)]  # предполагаем 7 серверов
@@ -53,13 +50,15 @@ async def get_server_choice(update: Update, context: CallbackContext) -> int:
 
 
 async def server_chosen(update: Update, context: CallbackContext) -> int:
+
     user_id = update.callback_query.from_user.id
+    user_name = update.callback_query.from_user.name
     query = update.callback_query
     await query.answer()
     server = query.data
     context.user_data['server'] = server
 
-    logger.info(f"Пользователь {user_id} выбрал сервер №: {server}")
+    logger.info(f"Пользователь {user_name} ({user_id}) выбрал сервер №: {server}")
 
     await query.edit_message_text(text=f"Вы выбрали сервер {server}. Начинаю обработку...")
 
@@ -71,7 +70,9 @@ async def server_chosen(update: Update, context: CallbackContext) -> int:
     file_path = save_results_to_file(results)
 
     if os.path.getsize(file_path) > 0:
+
         await context.bot.send_document(chat_id=update.effective_chat.id, document=open(file_path, 'rb'))
+        logger.info(f"Пользователь {user_name} ({user_id}) получил файл с наказаниями {nicknames}")
     else:
         await context.bot.send_message(chat_id=update.effective_chat.id,
                                        text="Не удалось найти информацию для предоставленных никнеймов.")
@@ -90,10 +91,11 @@ async def process_nicknames(update: Update, context: CallbackContext, nicknames,
     options.add_argument('--no-sandbox')
     options.add_argument('--disable-dev-shm-usage')
     options.add_argument('--disable-gpu')
-
+    user_id = update.callback_query.from_user.id
+    user_name = update.callback_query.from_user.name
     with webdriver.Chrome(service=service, options=options) as driver:
         for nick in nicknames:
-            logger.info(f"Пользователь {user_id} ищет аккаунт: {nick} на сервере {server}")
+            logger.info(f"Пользователь {user_name} ({user_id}) ищет аккаунт: {nick} на сервере {server}")
             player_id, reg_ip, last_ip = await get_player_info(update, context, driver, nick, server)
 
             if player_id:
@@ -123,7 +125,7 @@ async def get_player_info(update: Update, context: CallbackContext, driver, nick
             driver.add_cookie(cookie)
         driver.get(url)  # Перезагрузка страницы после добавления куки
         WebDriverWait(driver, 15).until(EC.presence_of_all_elements_located((By.TAG_NAME, "td")))
-        logger.info(url)
+        logger.debug(url)
 
         html = driver.page_source
         soup = BeautifulSoup(html, 'html.parser')
@@ -133,7 +135,7 @@ async def get_player_info(update: Update, context: CallbackContext, driver, nick
             player_id = rows[0].get_text().strip()
             last_ip = rows[-3].get_text().strip()  # Третий с конца <tr>
             reg_ip = rows[-2].get_text().strip()  # Второй с конца <tr>
-            logger.info(f"Получена информация для {nick}: player_id={player_id}, reg_ip={reg_ip}, last_ip={last_ip}")
+            logger.debug(f"Получена информация для {nick}: player_id={player_id}, reg_ip={reg_ip}, last_ip={last_ip}")
             return player_id, reg_ip, last_ip
         else:
             logger.warning(f"Ожидаемая структура таблицы не найдена для {nick}")
@@ -145,7 +147,7 @@ async def get_player_info(update: Update, context: CallbackContext, driver, nick
 
 async def find_related_accounts(update: Update, context: CallbackContext, driver, reg_ip, last_ip):
     user_id = update.effective_user.id
-    logger.info(f"Пользователь {user_id} ищет связанные аккаунты по IP: {reg_ip} и {last_ip}")
+    logger.debug(f"Пользователь {user_id} ищет связанные аккаунты по IP: {reg_ip} и {last_ip}")
 
     gaserver = get_server(user_id)
     related_ids = set()
@@ -176,13 +178,13 @@ async def find_related_accounts(update: Update, context: CallbackContext, driver
         except Exception as e:
             logger.error(f"Ошибка при поиске связанных аккаунтов по IP {ip}: {e}")
 
-    logger.info(f"Найдено связанных аккаунтов: {related_ids}")
+    logger.debug(f"Найдено связанных аккаунтов: {related_ids}")
     return related_ids
 
 
 async def get_account_logs(update: Update, context: CallbackContext, driver, player_id):
     user_id = update.effective_user.id
-    logger.info(f"Пользователь {user_id} начал получение логов для аккаунта {player_id}")
+    logger.debug(f"Пользователь {user_id} начал получение логов для аккаунта {player_id}")
 
     gaserver = get_server(user_id)
 
@@ -206,8 +208,7 @@ async def get_account_logs(update: Update, context: CallbackContext, driver, pla
             cells = row.find_all('td')[:-2]  # Ищем все клетки в строке, кроме последних двух
             log_line = ' '.join(cell.get_text().strip() for cell in cells)
             logs.append(log_line)
-
-        logger.info(f"Получены логи для аккаунта {player_id}: {logs}")
+        logger.debug(f"{player_id} получил логи")
         return logs
     except Exception as e:
         logger.error(f"Ошибка при получении логов для аккаунта {player_id}: {e}")

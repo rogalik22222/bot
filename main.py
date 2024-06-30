@@ -1,3 +1,5 @@
+import sys
+import os
 import logging
 from telegram import Update, ReplyKeyboardMarkup, ReplyKeyboardRemove, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ConversationHandler, CallbackQueryHandler, CallbackContext
@@ -26,32 +28,36 @@ import sqlite3
 from config import *
 from accountban_handler import accountcc_handler, account_start as acc_start
 from uval_handler import *
-from gospay_handler import check_start as gos_start, date_from_gos,  date_to_gos, get_fraction, FRACTION
+from gospay_handler import check_start as gos_start, date_from_gos, date_to_gos, get_fraction, FRACTION
 import logging
 import sys
 from get_log import send_file
-# Initialize logging configuration
+
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     level=logging.INFO,
     handlers=[
-        logging.FileHandler('bot.log', encoding='utf-8', mode='a'),
-        logging.StreamHandler(sys.stdout)
+        logging.FileHandler('bot.log', encoding='utf-8')
     ]
 )
-
-logger = logging.getLogger(__name__)
+logging.getLogger('httpx').setLevel(logging.WARNING)
+logging.getLogger('WDM').setLevel(logging.WARNING)
+# Пример логирования
+logger = logging.getLogger()
 
 
 
 DATE_FROM, DATE_TO, NICKNAMES, SERVER, NICKNAME, DELETE_USER , ROLE_USER_ID, ROLE_NEW_ROLE, TELEGRAM_USER  = range(9)
 
 async def log_button_press(update: Update, context: CallbackContext) -> None:
+
     user = update.message.from_user
-    logger.info(f"User {user.username} ({user.id}) pressed button: {update.message.text}")
+    logger.info(f"Пользователь {user.username} ({user.id}) Нажал на кнопку: {update.message.text}")
 
 async def cancel(update: Update, context: CallbackContext) -> int:
     await update.message.reply_text("Операция отменена.")
+    user = update.message.from_user
+    logger.info(f"Пользователь {user.username} ({user.id}) Отменил действие")
     return ConversationHandler.END
 
 async def start(update: Update, context: CallbackContext) -> None:
@@ -116,7 +122,7 @@ async def start(update: Update, context: CallbackContext) -> None:
         )
 
     await update.message.reply_text(
-        "Выберите действие:", reply_markup=reply_markup
+        "Ждите одобрения", reply_markup=reply_markup
     )
 
 async def register_start(update: Update, context: CallbackContext) -> int:
@@ -137,9 +143,15 @@ async def register_start(update: Update, context: CallbackContext) -> int:
         )
         await start(update, context)
         return ConversationHandler.END
+
+    elif role in ['sled', 'tech', 'admin', 'developer']:
+        await update.message.reply_text(f"Вы уже зарегестрированы и имеете доступ {role}")
+
     elif role == 'removed' and role is not None:
         await start(update, context)
         return ConversationHandler.END
+
+
 
     await update.message.reply_text("Напишите ваш Nick_name:")
     return NICKNAME
@@ -264,12 +276,15 @@ async def manage_accounts(update: Update, context: CallbackContext) -> None:
         ),
     )
 
+
 async def list_pending_users(update: Update, context: CallbackContext):
+    user_id = update.message.from_user.id
     pending_users = get_all_users()  # Fetch users with 'registered' status
-    pending_users = [user for user in pending_users if user[2] == "registered"]
+    pending_users = [user for user in pending_users if user[3] == "registered"]
 
     if not pending_users:
         await update.message.reply_text("Нет ожидающих заявок.")
+        logger.info(f"Пользователь {user_id} запросил список ожидающих заявок. Ожидающих заявок нет.")
         return
 
     buttons = []
@@ -283,112 +298,84 @@ async def list_pending_users(update: Update, context: CallbackContext):
 
     user_info = "\n\n".join([f"User ID: {user[0]}\nNickname: {user[1]}\nServer: {user[3]}" for user in pending_users])
     await update.message.reply_text(user_info, reply_markup=reply_markup)
+    logger.info(f"Пользователь {user_id} запросил список ожидающих заявок. Найдено {len(pending_users)} заявок.")
 
 
-# Callback for processing admin requests to approve or reject user roles
-async def list_pending_users(update: Update, context: CallbackContext):
-    pending_users = get_all_users()  # Fetch users with 'registered' status
-    pending_users = [user for user in pending_users if user[2] == "registered"]
-
-    if not pending_users:
-        await update.message.reply_text("Нет ожидающих заявок.")
-        return
-
-    buttons = []
-    for user in pending_users:
-        buttons.append([
-            InlineKeyboardButton(f"Одобрить {user[0]}", callback_data=f"approve_admin_{user[0]}"),
-            InlineKeyboardButton(f"Отказать {user[0]}", callback_data=f"reject_admin_{user[0]}")
-        ])
-
-    reply_markup = InlineKeyboardMarkup(buttons)
-
-    user_info = "\n\n".join([f"User ID: {user[0]}\nNickname: {user[1]}\nServer: {user[3]}" for user in pending_users])
-    await update.message.reply_text(user_info, reply_markup=reply_markup)
-
-
-# Callback for processing admin requests to change role
-async def list_pending_users(update: Update, context: CallbackContext):
-    pending_users = get_all_users()  # Fetch users with 'registered' status
-    pending_users = [user for user in pending_users if user[2] == "registered"]
-
-    if not pending_users:
-        await update.message.reply_text("Нет ожидающих заявок.")
-        return
-
-    buttons = []
-    for user in pending_users:
-        buttons.append([
-            InlineKeyboardButton(f"Одобрить {user[0]}", callback_data=f"approve_admin_{user[0]}"),
-            InlineKeyboardButton(f"Отказать {user[0]}", callback_data=f"reject_admin_{user[0]}")
-        ])
-
-    reply_markup = InlineKeyboardMarkup(buttons)
-
-    user_info = "\n\n".join([f"User ID: {user[0]}\nNickname: {user[1]}\nServer: {user[3]}" for user in pending_users])
-    await update.message.reply_text(user_info, reply_markup=reply_markup)
-
-
-# Callback for processing admin requests to change role
 async def button_callback(update: Update, context: CallbackContext):
     query = update.callback_query
     await query.answer()  # Answer callback query to stop the loading circle
 
     query_data = query.data
-    user_id = int(query_data.split('_')[2])
-    action = query_data.split('_')[1]
-    role = query_data.split('_')[0]
+    query_parts = query_data.split('_')
+    admin_id = query.from_user.id
 
-    logger.info(f"Callback query data: {query_data}")
-    logger.info(f"User ID: {user_id}, Action: {action}, Role: {role}")
+    logger.debug(f"Пользователь {admin_id} инициировал действие: {query_data}")
 
-    # Corrected role verification
+    if len(query_parts) != 2:
+        logger.error(f"Неверный формат callback_data: {query_data}")
+        await query.answer("Произошла ошибка: неверный формат данных.")
+        return
+
+    action, user_id_str = query_parts
+    try:
+        user_id = int(user_id_str)
+    except ValueError:
+        logger.error(f"Неверный ID пользователя: {user_id_str}")
+        await query.answer("Произошла ошибка: неверный ID пользователя.")
+        return
+
     user_role = get_user_role(query.from_user.id)
     if user_role != "admin" and user_role != "developer":
         await query.answer("У вас нет прав для этого действия.")
+        logger.warning(
+            f"Пользователь {admin_id} попытался выполнить {action} для пользователя {user_id} без необходимых прав.")
         return
 
-    # Handle admin role for user approval/rejection
-    if role == "approve":
+    if action == "approve":
         update_user_role(user_id, "sled")
         await query.answer(f"Пользователь {user_id} одобрен.")
-    elif role == "reject":
+        logger.info(f"Пользователь {admin_id} одобрил пользователя {user_id}.")
+    elif action == "reject":
         update_user_role(user_id, "removed")
         await query.answer(f"Пользователь {user_id} отклонён.")
+        logger.info(f"Пользователь {admin_id} отклонил пользователя {user_id}.")
     else:
         await query.answer("Неизвестное действие.")
+        logger.error(f"Пользователь {admin_id} инициировал неизвестное действие: {query_data}")
         return
 
-    # Update pending user list for admin actions
     pending_users = get_all_users()
-    pending_users = [user for user in pending_users if user[2] == "registered"]
+    pending_users = [user for user in pending_users if user[3] == "registered"]
 
     if pending_users:
         buttons = []
         for user in pending_users:
             buttons.append([
-                InlineKeyboardButton(f"Одобрить {user[0]}", callback_data=f"approve_admin_{user[0]}"),
-                InlineKeyboardButton(f"Отказать {user[0]}", callback_data=f"reject_admin_{user[0]}")
+                InlineKeyboardButton(f"Одобрить {user[0]}", callback_data=f"approve_{user[0]}"),
+                InlineKeyboardButton(f"Отказать {user[0]}", callback_data=f"reject_{user[0]}")
             ])
         reply_markup = InlineKeyboardMarkup(buttons)
         user_info = "\n\n".join(
-            [f"User ID: {user[0]}\nNickname: {user[1]}\nServer: {user[3]}" for user in pending_users])
+            [f"User ID: {user[0]}\nTG Nickname: {user[1]}\nNickname: {user[2]}\nServer: {user[4]}" for user in pending_users])
 
-        # Check if the new content is different before editing the message
         if query.message.text != user_info:
             await query.edit_message_text(user_info, reply_markup=reply_markup)
     else:
         await query.edit_message_text("Нет ожидающих заявок.")
+    logger.info(f"Обновлён список ожидающих заявок пользователем {admin_id}.")
 
-# Change role conversation handler implementation with admin role check
+# Аналогично добавьте логирование для других функций
+# Например, для функции change_role_start:
 async def change_role_start(update: Update, context: CallbackContext) -> int:
-    # Проверка прав пользователя перед продолжением
-    user_role = get_user_role(update.message.from_user.id)
+    user_id = update.message.from_user.id
+    user_role = get_user_role(user_id)
     if user_role not in ["admin", "developer"]:
         await update.message.reply_text("У вас нет прав для изменения роли пользователей.")
+        logger.warning(f"Пользователь {user_id} попытался изменить роль пользователя без необходимых прав.")
         return ConversationHandler.END
 
     await update.message.reply_text("Введите ID пользователя для изменения роли:")
+    logger.info(f"Пользователь {user_id} начал процесс изменения роли.")
     return ROLE_USER_ID
 
 async def change_role_user_id(update: Update, context: CallbackContext) -> int:
@@ -411,7 +398,7 @@ async def change_role_new_role(update: Update, context: CallbackContext) -> int:
             # Удаляем текущего админа
             update_user_role(update.message.from_user.id, "removed")
             await update.message.reply_text(
-                "Ваш статус был удалён за попытку дать роль высокого статуса другому пользователю.")
+                "Ваш статус был удалён за попытку дать роль developer другому пользователю.")
             return ConversationHandler.END
 
         # Если текущий пользователь админ и хочет выдать роль developer другому пользователю
@@ -431,6 +418,9 @@ async def change_role_new_role(update: Update, context: CallbackContext) -> int:
     try:
         user_id = int(user_id)
         update_user_role(user_id, new_role)
+        user = update.message.from_user
+
+        logger.info(f"Пользователь {user.username} ({user.id}) Изменил роль пользователю {user_id} на {new_role}")
         await update.message.reply_text(f"Роль пользователя {user_id} изменена на {new_role}.")
     except ValueError:
         await update.message.reply_text("Некорректный ID пользователя.")
@@ -456,6 +446,7 @@ async def delete_user_main(update: Update, context: CallbackContext) -> int:
     try:
         user_id = int(user_id)
         delete_user(user_id)
+        logger.info(f"Пользователь {user_id} Удалён")
         await update.message.reply_text(f"Пользователь {user_id} удален.")
     except Exception as e:
         await update.message.reply_text(f"Ошибка при удалении пользователя: {e}")
@@ -466,8 +457,10 @@ async def delete_user_main(update: Update, context: CallbackContext) -> int:
 async def list_users(update: Update, context: CallbackContext) -> None:
     user_id = update.message.from_user.id
     roles = get_user_role(user_id)
+    user = update.message.from_user
     if roles == 'developer'  or roles == 'admin':
         users = get_all_users()
+        logger.info(f"Пользователь {user.username} ({user.id}) Запросил список пользователей")
         response = "Список пользователей:\n"
         for user in users:
             response += f"ID: {user[0]}, Telegram: {user[1]}, Nick_Name: {user[2]}, Dostup: {user[3]}, Server:{user[4]}\n"
@@ -479,6 +472,7 @@ async def list_users(update: Update, context: CallbackContext) -> None:
 
 
 async def back_to_main(update: Update, context: CallbackContext) -> None:
+    await log_button_press(update, context)
     await start(update, context)
 
 
@@ -614,3 +608,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+

@@ -9,37 +9,40 @@ from config import COOKIES
 from database import init_db, add_user, get_user_role, update_user_role, get_all_users, delete_user
 import sqlite3
 from dostups import *
+from database import *
+import logging
+# Initialize the database
 init_db()
 
+# Constants for conversation states
 NICKNAMES = range(1)
-
-
-
+logger = logging.getLogger()
 async def check_start(update: Update, context: CallbackContext) -> int:
     user_id = update.message.from_user.id
-    roles = get_user_role(user_id)  # Предположим, что get_user_role возвращает строку с ролью пользователя
-
-    # Проверяем роль пользователя
+    roles = get_user_role(user_id)  # Assume get_user_role returns a string with the user's role
+    user = update.message.from_user
+    # Check the user's role
     if roles in ['sled', 'tech', 'admin', 'developer']:
         await update.message.reply_text('Введите никнеймы (каждый новый ник на новой строке):')
-        return NICKNAMES  # Возвращаем состояние, в котором пользователь может вводить никнеймы
+        logger.info(f"Пользователь {user.username} ({user.id}) Нажал на кнопку проверки привязок")
+        return NICKNAMES  # Return state where the user can enter nicknames
 
-    # Если не найдено подходящих ролей, отправляем сообщение об отказе
+    # If no suitable roles found, send access denied message
     await update.message.reply_text('Отказано в доступе')
-    return ConversationHandler.END  # Завершаем обработчик разговора
+    return ConversationHandler.END
 
-
-
-def get_player_id(nick):
+async def get_player_id(nick, aserver) ->  int:
     service = Service(ChromeDriverManager().install())
     options = webdriver.ChromeOptions()
-    options.add_argument('--headless')  # только если необходимо
+    options.add_argument('--headless')  # only if necessary
     options.add_argument('--no-sandbox')
     options.add_argument('--disable-dev-shm-usage')
     options.add_argument('--disable-gpu')
 
+
+
     driver = webdriver.Chrome(service=service, options=options)
-    url = f"https://rodina.logsparser.info/accounts?server_number=5&name={nick}+"
+    url = f"https://rodina.logsparser.info/accounts?server_number={aserver}&name={nick}+"
 
     try:
         driver.get(url)
@@ -69,25 +72,27 @@ def get_player_id(nick):
 async def check_nicknames(update: Update, context: CallbackContext) -> int:
     nicks = update.message.text.split('\n')
     nicks = [nick.strip() for nick in nicks]
-
+    user_id = update.message.from_user.id
+    aserver = get_server(user_id)
     for nick in nicks:
         checking_message = await update.message.reply_text(f'Начинаю проверку привязок для никнейма: {nick}')
-
+        user = update.message.from_user
+        logger.info(f"Пользователь {user.username} ({user.id}  Начал проверку привязок {nick}")
         try:
-            player_id = get_player_id(nick)
+            player_id = await get_player_id(nick, aserver)
             if not player_id:
                 await checking_message.edit_text(f'Не удалось найти ID для никнейма {nick}')
                 continue
 
             service = Service(ChromeDriverManager().install())
             options = webdriver.ChromeOptions()
-            options.add_argument('--headless')  # только если необходимо
+            options.add_argument('--headless')  # only if necessary
             options.add_argument('--no-sandbox')
             options.add_argument('--disable-dev-shm-usage')
             options.add_argument('--disable-gpu')
 
             driver = webdriver.Chrome(service=service, options=options)
-            url = f"https://rodina.logsparser.info/?server_number=5&type%5B%5D=mail&type%5B%5D=password&type%5B%5D=vk_attach&type%5B%5D=vk_detach&type%5B%5D=googleauth_attach&type%5B%5D=googleauth_detach&sort=desc&player={player_id}&limit=1000"
+            url = f"https://rodina.logsparser.info/?server_number={aserver}&type%5B%5D=mail&type%5B%5D=password&type%5B%5D=vk_attach&type%5B%5D=vk_detach&type%5B%5D=googleauth_attach&type%5B%5D=googleauth_detach&sort=desc&player={player_id}&limit=1000"
 
             driver.get(url)
             for cookie in COOKIES:
@@ -116,7 +121,8 @@ async def check_nicknames(update: Update, context: CallbackContext) -> int:
             await checking_message.edit_text(f'Произошла ошибка при проверке привязок для никнейма {nick}: {e}')
         finally:
             driver.quit()
-
+        user = update.message.from_user
+        logger.info(f"Пользователь {user.username} ({user.id}) Закончил проверку привязок {nick}")
     await update.message.reply_text('Выгрузка закончена.')
     return ConversationHandler.END
 
@@ -146,7 +152,6 @@ def parse_account_activities(log_lines):
 async def cancel(update: Update, context: CallbackContext) -> int:
     await update.message.reply_text("Операция отменена.")
     return ConversationHandler.END
-
 
 def get_conversation_handler() -> ConversationHandler:
     return ConversationHandler(
