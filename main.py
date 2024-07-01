@@ -227,7 +227,7 @@ async def for_adm_acc_button(update: Update, context: CallbackContext) -> int:
     role = get_user_role(user_id)
     if role in ['admin', 'developer']:
         reply_keyboard = [
-            ["Список заявок🗒", "Список пользователей👨‍👨‍👧‍👦", "Изменить доступ🔐"],
+            ["Список заявок🗒", "Список пользователей👩‍👩‍👦‍👦", "Изменить доступ🔐"],
             ["Назад"],
         ]
         await update.message.reply_text(
@@ -464,7 +464,7 @@ async def list_users(update: Update, context: CallbackContext) -> None:
     user_id = update.message.from_user.id
     roles = get_user_role(user_id)
     user = update.message.from_user
-    if roles == 'developer'  or roles == 'admin':
+    if roles == 'developer':
         users = get_all_users()
         logger.info(f"Пользователь {user.username} ({user.id}) Запросил список пользователей")
         response = "Список пользователей:\n"
@@ -473,6 +473,22 @@ async def list_users(update: Update, context: CallbackContext) -> None:
         await update.message.reply_text(response)
     else:
         await update.message.reply_text("Отказано в доступе")
+
+async def list_users_admin(update: Update, context: CallbackContext) -> None:
+    user_id = update.message.from_user.id
+    roles = get_user_role(user_id)
+    user = update.message.from_user
+    if roles == 'developer'  or roles == 'admin':
+        users = get_all_users()
+        logger.info(f"Пользователь {user.username} ({user.id}) Запросил список пользователей")
+        response = "Список пользователей:\n"
+        for user in users:
+            response += f"ID: {user[0]}, Nick_Name: {user[2]}, Dostup: {user[3]}, Server:{user[4]}\n"
+        await update.message.reply_text(response)
+    else:
+        await update.message.reply_text("Отказано в доступе")
+
+
 
 
 
@@ -583,6 +599,7 @@ def main() -> None:
     application.add_handler(MessageHandler(filters.Regex("^Управление аккаунтами🔧$"), manage_accounts))
     application.add_handler(MessageHandler(filters.Regex("^Управление аккаунтами🔐$"), for_adm_acc_button))
     application.add_handler(MessageHandler(filters.Regex("^Список пользователей👨‍👨‍👧‍👦$"), list_users))
+    application.add_handler(MessageHandler(filters.Regex("^Список пользователей👩‍👩‍👦‍👦$"), list_users_admin))
     application.add_handler(register_handler)
     application.add_handler(MessageHandler(filters.Regex("^Назад$"), back_to_main))
     application.add_handler(MessageHandler(filters.Regex("^Для следящих☠️$"), sled_button))

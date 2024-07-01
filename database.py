@@ -57,5 +57,11 @@ def get_server(user_id):
         result = cursor.fetchone()
         return result[0] if result else None
 
+def get_all_users_admin():
+    with sqlite3.connect("database.db") as conn:
+         cursor = conn.cursor()
+         cursor.execute("SELECT user_id, nickname, role, server FROM users")
+         return cursor.fetchall()
+
 
 
