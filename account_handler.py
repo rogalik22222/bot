@@ -10,10 +10,9 @@ from config import COOKIES
 from database import *
 import sys
 
-
-
 NICKNAMES = range(1)
 logger = logging.getLogger()
+
 async def account_start(update: Update, context: CallbackContext) -> int:
     user_id = update.message.from_user.id
     role = get_user_role(user_id)
