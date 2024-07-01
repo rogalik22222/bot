@@ -40,11 +40,16 @@ async def get_player_id(update: Update, context: CallbackContext, nick: str):
     options.add_argument('--no-sandbox')
     options.add_argument('--disable-dev-shm-usage')
     options.add_argument('--disable-gpu')
+    options.add_argument('--user-data-dir=/tmp/chrome_user_data')
+    options.add_argument('--enable-logging')
+    options.add_argument('--v=1')
 
     driver = webdriver.Chrome(service=service, options=options)
     url = f"https://rodina.logsparser.info/accounts?server_number={server}&name={nick}+"
 
     try:
+        driver.set_page_load_timeout(30)
+        driver.implicitly_wait(10)
         driver.get(url)
         for cookie in COOKIES:
             driver.add_cookie(cookie)
