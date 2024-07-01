@@ -98,7 +98,10 @@ async def find_ip(update: Update, context: CallbackContext) -> int:
         url1 = f"https://rodina.logsparser.info/?server_number={server}&type%5B%5D=disconnect&sort=desc&player={player_id}&limit=1000"
         service = Service(ChromeDriverManager().install())
         options = webdriver.ChromeOptions()
-        options.add_argument('--headless')
+        options.add_argument('--headless')  # только если необходимо
+        options.add_argument('--no-sandbox')
+        options.add_argument('--disable-dev-shm-usage')
+        options.add_argument('--disable-gpu')
 
         driver = webdriver.Chrome(service=service, options=options)
         try:
