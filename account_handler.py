@@ -28,7 +28,7 @@ async def account_start(update: Update, context: CallbackContext) -> int:
 async def get_player_id(update: Update, context: CallbackContext, nick: str):
     user_id = update.message.from_user.id
     logger.debug("Запуск браузера для получения player_id")
-    logger.debug(f"Пользователь: {user_id} начал проверку твинов игрока: {nick}")
+    logger.debug(f"Пользователь: {user_id} начал проверку твинков игрока: {nick}")
     user = update.message.from_user
     logger.info(f"Пользователь {user.username} ({user.id}) начал проверку твинков игрока: {nick}")
     await update.message.reply_text(f'Начал поиск id аккаунта {nick}')
@@ -39,11 +39,10 @@ async def get_player_id(update: Update, context: CallbackContext, nick: str):
     options.add_argument('--no-sandbox')
     options.add_argument('--disable-dev-shm-usage')
     options.add_argument('--disable-gpu')
-    options.add_argument('--user-data-dir=/tmp/chrome_user_data')
-    options.add_argument('--enable-logging')
-    options.add_argument('--v=1')
 
     driver = webdriver.Chrome(service=service, options=options)
+
+
     url = f"https://rodina.logsparser.info/accounts?server_number={server}&name={nick}+"
 
     try:
